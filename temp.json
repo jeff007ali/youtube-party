@@ -1,0 +1,11 @@
+{"things to consider": ['playbackRate', 'play', 'pause']}
+
+
+
+{
+    "event" : "start/stop/play/playbackRate/seekTo",
+    "state" : "start/pause/play",
+    "videoId": "M7lc1UVf-VE",
+    "startSeconds": 5,
+    "playbackRate": 1
+}
