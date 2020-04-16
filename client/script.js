@@ -8,18 +8,18 @@ firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 // This function creates an <iframe> (and YouTube player)
 // after the API code downloads.
 var player;
-function onYouTubeIframeAPIReady() {
-  player = new YT.Player('player', {
-    height: '390',
-    width: '640',
-    // videoId: videoId,
-    events: {
-      'onReady': onPlayerReady,
-      'onStateChange': onPlayerStateChange,
-      'onPlaybackRateChange': onPlayerPlaybackRateChange
-    }
-  });
-}
+// function onYouTubeIframeAPIReady() {
+//   player = new YT.Player('player', {
+//     height: '390',
+//     width: '640',
+//     // videoId: videoId,
+//     events: {
+//       'onReady': onPlayerReady,
+//       'onStateChange': onPlayerStateChange,
+//       'onPlaybackRateChange': onPlayerPlaybackRateChange
+//     }
+//   });
+// }
 
 // The API will call this function when the video player is ready.
 function onPlayerReady(event) {
@@ -50,7 +50,7 @@ var sendButton = document.getElementById("sendButton");
 var message = document.getElementById("message");
 
 var peer = new Peer();
-connect_to_peer("vk6sr92c4h000000");
+connect_to_peer("b0so089ab9m00000");
 
 peer.on("connection", function(conn) {
   handle_connection(conn);
@@ -115,10 +115,48 @@ function handle_connection(conn) {
       }
       else if (data.type == "event_data") {
         var payload = data.payload;
-        if (payload.event == -1) {
-          player.loadVideoById(payload.videoId, payload.startSeconds);
-          player.playVideo();
+        // function onYouTubeIframeAPIReady() {
+        if (player == null){
+          player = new YT.Player('player', {
+            height: '390',
+            width: '640',
+            videoId: payload.videoId,
+            playerVars: {
+              autoplay: 1,
+              start: Math.ceil(payload.startSeconds)
+            },
+            events: {
+              'onReady': onPlayerReady,
+              'onStateChange': onPlayerStateChange,
+              'onPlaybackRateChange': onPlayerPlaybackRateChange
+            }
+          });
         }
+        else {
+          if (payload.event == 2) {
+            player.seekTo(payload.startSeconds, true)
+            // player.loadVideoById(payload.videoId, payload.startSeconds);
+            player.pauseVideo();
+          }
+          else if (payload.event == 1) {
+            player.seekTo(Math.ceil(payload.startSeconds), true)
+            player.playVideo();
+          }
+          else if (payload.event == 3) {
+            player.seekTo(payload.startSeconds, true)
+            player.pauseVideo();
+          }
+          else if (payload.event == -7){
+            player.seekTo(payload.startSeconds, true)
+            player.setPlaybackRate(payload.playbackRate);
+          }
+        }
+         
+        // }
+        // if (payload.event == -1) {
+        //   player.loadVideoById(payload.videoId, payload.startSeconds);
+        //   player.playVideo();
+        // }
         
       }
     }

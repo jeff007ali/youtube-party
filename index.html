@@ -19,7 +19,7 @@
         player = new YT.Player('player', {
           height: '390',
           width: '640',
-        //   videoId: 'M7lc1UVf-VE',
+          // videoId: 'M7lc1UVf-VE',
           playerVars: {
             autoplay: 1
           },
@@ -33,9 +33,11 @@
       // 4. The API will call this function when the video player is ready.
       function onPlayerReady(event) {
         
-        // event.target.loadVideoById("bHQqvYy5KYo", 61);
+        event.target.loadVideoById("bHQqvYy5KYo");
+        // event.target.mute();
         // setTimeout(event.target.playVideo(), 1000);
-        event.target.playVideo();
+        event.target.seekTo(61, true);
+        event.player.playVideo();
       }
 
       // 5. The API calls this function when the player's state changes.

@@ -7,7 +7,7 @@ firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
 // This function creates an <iframe> (and YouTube player)
 // after the API code downloads.
-var videoId = 'M7lc1UVf-VE';
+var videoId = 'Dg0IjOzopYU';
 
 var player;
 function onYouTubeIframeAPIReady() {
@@ -15,6 +15,9 @@ function onYouTubeIframeAPIReady() {
     height: '390',
     width: '640',
     videoId: videoId,
+    playerVars: {
+      autoplay: 1
+    },
     events: {
       'onReady': onPlayerReady,
       'onStateChange': onPlayerStateChange,
@@ -31,13 +34,14 @@ function onPlayerReady(event) {
 // The API calls this function when the player's state changes.
 // var done = false;
 function onPlayerStateChange(event) {
+  console.log("Playlist index on state change is: " + event.data);
   if (event.data == YT.PlayerState.PLAYING || event.data == YT.PlayerState.PAUSED || event.data == YT.PlayerState.BUFFERING) {
-    // broadcast_data();
+    broadcast_data();
   }
 }
 
 function onPlayerPlaybackRateChange(event) {
-  // broadcast_data();
+  broadcast_data(null, true);
 }
 
 // function stopVideo() {
@@ -70,6 +74,7 @@ peer.on("open", function(id) {
   }
   console.log("ON");
   console.log("My peer ID is: " + peer.id);
+  alert(peer.id);
 });
 
 //   Initializes connection
@@ -116,7 +121,8 @@ function handle_connection(conn) {
   });
 
   connections.push(conn);
-  setTimeout(broadcast_data(conn), 1000);
+  conn.send("kuch bhi")
+  setTimeout(function() {broadcast_data(conn, false);}, 500);
   broadcast_new_connection(conn.peer);
 }
 
@@ -170,8 +176,14 @@ function broadcast_new_connection(peer_id) {
   }
 }
 
-function fetch_current_video_status() {
+function fetch_current_video_status(isPlayback) {
   yt_event = player.getPlayerState();
+  if (isPlayback){
+    yt_event = -7;
+  }
+  else {
+    yt_event = player.getPlayerState();
+  }
   videoId = videoId;
   startSeconds = player.getCurrentTime();
   playbackRate = player.getPlaybackRate();
@@ -187,11 +199,18 @@ function fetch_current_video_status() {
   return payload;
 }
 
-function broadcast_data(conn) {
+function broadcast_data(conn=null, isPlayback=false) {
   console.log(conn);
-  payloadData = fetch_current_video_status();
+  payloadData = fetch_current_video_status(isPlayback);
   msg = { type: "event_data", payload: payloadData };
-  // for (var i = 0; i < connections.length; i++) {
+
+  if (conn !== null) {
     conn.send(msg);
-  // }
+  }
+  else {
+    for (var i = 0; i < connections.length; i++) {
+      connections[i].send(msg);
+    }
+  }
+  
 }
