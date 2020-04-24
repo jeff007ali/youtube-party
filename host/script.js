@@ -7,7 +7,8 @@ firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
 // This function creates an <iframe> (and YouTube player)
 // after the API code downloads.
-var videoId = 'Dg0IjOzopYU';
+var videoId = 'sAKjyRs-n34';
+var isStateChangeFromBroadcastData = false;
 
 var player;
 function onYouTubeIframeAPIReady() {
@@ -35,13 +36,25 @@ function onPlayerReady(event) {
 // var done = false;
 function onPlayerStateChange(event) {
   console.log("Playlist index on state change is: " + event.data);
-  if (event.data == YT.PlayerState.PLAYING || event.data == YT.PlayerState.PAUSED || event.data == YT.PlayerState.BUFFERING) {
-    broadcast_data();
+  console.log("state of flag : " + isStateChangeFromBroadcastData);
+  if (!isStateChangeFromBroadcastData) {
+    if (event.data == YT.PlayerState.PLAYING || event.data == YT.PlayerState.PAUSED || event.data == YT.PlayerState.BUFFERING) {
+      broadcast_data();
+    }
+    
   }
+  if (event.data != YT.PlayerState.BUFFERING && isStateChangeFromBroadcastData) {
+    isStateChangeFromBroadcastData = false;
+  }
+  
 }
 
 function onPlayerPlaybackRateChange(event) {
-  broadcast_data(null, true);
+  
+  // if (!isStateChangeFromBroadcastData) {
+    broadcast_data(null, "playbackRateChange");
+  // }
+  // isStateChangeFromBroadcastData = false;
 }
 
 // function stopVideo() {
@@ -53,6 +66,7 @@ function onPlayerPlaybackRateChange(event) {
 // webRTC
 var status = document.getElementById("status");
 
+var own_id;
 var peer_ids = [];
 var connections = [];
 var lastPeerId = null;
@@ -72,9 +86,11 @@ peer.on("open", function(id) {
   } else {
       lastPeerId = peer.id;
   }
+
+  own_id = peer.id;
   console.log("ON");
   console.log("My peer ID is: " + peer.id);
-  alert(peer.id);
+  createInviteLink(peer.id);
 });
 
 //   Initializes connection
@@ -108,7 +124,41 @@ function handle_connection(conn) {
   connection_status = true;
   conn.on("data", function(data) {
       addMessage(data);
-
+      // player.removeEventListener('onStateChange');
+      if (typeof data === "object" && data !== null) {
+        if (data.type == "event_data") {
+          var payload = data.payload;
+          console.log("received state  is: " + payload.event);
+          // videoId = payload.videoId;
+          // function onYouTubeIframeAPIReady() {
+          isStateChangeFromBroadcastData = true;
+          if (payload.event == 2) {
+            // isStateChangeFromBroadcastData = true;
+            player.seekTo(payload.startSeconds, true)
+            player.pauseVideo();
+          }
+          else if (payload.event == 1) {
+            // isStateChangeFromBroadcastData = true;
+            player.seekTo(Math.ceil(payload.startSeconds), true)
+            player.playVideo();
+          }
+          else if (payload.event == 3) {
+            // isStateChangeFromBroadcastData = true;
+            player.seekTo(payload.startSeconds, true)
+            player.pauseVideo();
+          }
+          else if (payload.event == "playbackRateChange") {
+            player.seekTo(payload.startSeconds, true)
+            player.setPlaybackRate(payload.playbackRate);
+          }
+          // else if (payload.event == "newStart") {
+          //   player.loadVideoById(payload.videoId);
+          //   player.playVideo();
+          // }
+          
+        }
+      }
+      // player.addEventListener('onStateChange', 'onPlayerStateChange');
       console.log("Data Received");
       console.log(data);
   });
@@ -121,8 +171,7 @@ function handle_connection(conn) {
   });
 
   connections.push(conn);
-  conn.send("kuch bhi")
-  setTimeout(function() {broadcast_data(conn, false);}, 500);
+  setTimeout(function() {broadcast_data(conn, null);}, 500);
   broadcast_new_connection(conn.peer);
 }
 
@@ -170,23 +219,23 @@ function broadcast_new_connection(peer_id) {
   msg = { type: "new_connection", peer_id: peer_id };
   for (var i = 0; i < connections.length; i++) {
       if (connections[i].peer == peer_id) {
-      continue;
+        continue;
       }
       connections[i].send(msg);
   }
 }
 
-function fetch_current_video_status(isPlayback) {
-  yt_event = player.getPlayerState();
-  if (isPlayback){
-    yt_event = -7;
+function fetch_current_video_status(event) {
+  var yt_event;
+  if (event != null){
+    yt_event = event;
   }
   else {
     yt_event = player.getPlayerState();
   }
-  videoId = videoId;
-  startSeconds = player.getCurrentTime();
-  playbackRate = player.getPlaybackRate();
+  // var videoId = videoId;
+  var startSeconds = player.getCurrentTime();
+  var playbackRate = player.getPlaybackRate();
 
   var payload = {
     "event" : yt_event,
@@ -199,9 +248,10 @@ function fetch_current_video_status(isPlayback) {
   return payload;
 }
 
-function broadcast_data(conn=null, isPlayback=false) {
-  console.log(conn);
-  payloadData = fetch_current_video_status(isPlayback);
+function broadcast_data(conn=null, event=null) {
+  
+  payloadData = fetch_current_video_status(event);
+  console.log("Sent state : " + payloadData.event);
   msg = { type: "event_data", payload: payloadData };
 
   if (conn !== null) {
@@ -213,4 +263,62 @@ function broadcast_data(conn=null, isPlayback=false) {
     }
   }
   
+}
+
+
+// To make invite link
+var invite_link = document.getElementById('invite_id');
+var copy_link_btn = document.getElementById('copy_link_btn');
+
+copy_link_btn.onclick = function() {
+  var invite_link = document.getElementById('invite_id');
+  invite_link.select();
+  try {
+    var successful = document.execCommand("copy");
+    var msg = successful ? 'successful' : 'unsuccessful';
+    console.log('Copying text command was ' + msg);
+  } catch (err) {
+    console.log('Oops, unable to copy');
+  }
+}
+
+function createInviteLink(host_id) {
+  var curr_url = window.location.href;
+  var split_url = curr_url.split("/");
+
+  split_url[split_url.length - 2] = "client";
+
+  var client_url = split_url.join('/') + "?host_id=" + host_id;
+  invite_link.value = client_url;
+
+}
+
+
+// To play new video
+function fetchVideoIdFromUrl(url) {
+  console.log(url);
+  var regExp = /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+  var match = url.match(regExp);
+  console.log(match);
+  if (match && match[2].length === 11) {
+    return match[2];
+  } else {
+    return false;
+  }
+}
+
+var load_video_btn = document.getElementById('load_video_btn');
+var video_url_txt = document.getElementById('video_url_txt');
+
+load_video_btn.onclick = function () {
+  var url = video_url_txt.value;
+  var vidId = fetchVideoIdFromUrl(url);
+
+  if (vidId != false) {
+    videoId = vidId;
+    player.loadVideoById(videoId);
+    player.playVideo();
+
+    broadcast_data(null, "newStart");
+  }
 }

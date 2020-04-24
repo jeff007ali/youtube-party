@@ -7,6 +7,9 @@ firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 
 // This function creates an <iframe> (and YouTube player)
 // after the API code downloads.
+var videoId;
+var isStateChangeFromBroadcastData = false;
+
 var player;
 // function onYouTubeIframeAPIReady() {
 //   player = new YT.Player('player', {
@@ -29,14 +32,22 @@ function onPlayerReady(event) {
 // The API calls this function when the player's state changes.
 var done = false;
 function onPlayerStateChange(event) {
-  if (event.data == YT.PlayerState.PLAYING && !done) {
-
-    // setTimeout(stopVideo, 6000);
-    // done = true;
+  console.log("Playlist index on state change is: " + event.data);
+  console.log("state of flag : " + isStateChangeFromBroadcastData);
+  if (!isStateChangeFromBroadcastData) {
+    if (event.data == YT.PlayerState.PLAYING || event.data == YT.PlayerState.PAUSED || event.data == YT.PlayerState.BUFFERING) {
+      broadcast_data();
+    }
+  }
+  if (event.data != YT.PlayerState.BUFFERING && isStateChangeFromBroadcastData) {
+    isStateChangeFromBroadcastData = false;
   }
 }
 function onPlayerPlaybackRateChange(event) {
-  // broadcast_data();
+  // if (!isStateChangeFromBroadcastData) {
+  //   broadcast_data(null, "playbackRateChange");
+  // }
+  // isStateChangeFromBroadcastData = false;
 }
 
 
@@ -48,9 +59,11 @@ var connection_status = false;
 var sendMessageBox = document.getElementById("sendMessageBox");
 var sendButton = document.getElementById("sendButton");
 var message = document.getElementById("message");
+var query_params = new URLSearchParams(window.location.search);
 
 var peer = new Peer();
-connect_to_peer("b0so089ab9m00000");
+var host_id = query_params.get('host_id');
+connect_to_peer(host_id);
 
 peer.on("connection", function(conn) {
   handle_connection(conn);
@@ -115,6 +128,8 @@ function handle_connection(conn) {
       }
       else if (data.type == "event_data") {
         var payload = data.payload;
+        videoId = payload.videoId;
+        console.log("received state  is: " + payload.event);
         // function onYouTubeIframeAPIReady() {
         if (player == null){
           player = new YT.Player('player', {
@@ -123,7 +138,8 @@ function handle_connection(conn) {
             videoId: payload.videoId,
             playerVars: {
               autoplay: 1,
-              start: Math.ceil(payload.startSeconds)
+              start: Math.ceil(payload.startSeconds),
+              controls: 0
             },
             events: {
               'onReady': onPlayerReady,
@@ -131,33 +147,41 @@ function handle_connection(conn) {
               'onPlaybackRateChange': onPlayerPlaybackRateChange
             }
           });
+
+          // setTimeout(function() {player.setPlaybackRate(payload.playbackRate);}, 500);
         }
         else {
+          // player.removeEventListener('onStateChange');
+          isStateChangeFromBroadcastData = true;
+          // isStateChangeFromBroadcastData = true;
           if (payload.event == 2) {
-            player.seekTo(payload.startSeconds, true)
-            // player.loadVideoById(payload.videoId, payload.startSeconds);
+            // isStateChangeFromBroadcastData = true;
+            player.seekTo(Math.ceil(payload.startSeconds), true);
             player.pauseVideo();
           }
           else if (payload.event == 1) {
-            player.seekTo(Math.ceil(payload.startSeconds), true)
+            // isStateChangeFromBroadcastData = true;
+            player.seekTo(Math.ceil(payload.startSeconds), true);
             player.playVideo();
           }
           else if (payload.event == 3) {
-            player.seekTo(payload.startSeconds, true)
+            // isStateChangeFromBroadcastData = true;
+            player.seekTo(Math.ceil(payload.startSeconds), true);
             player.pauseVideo();
           }
-          else if (payload.event == -7){
-            player.seekTo(payload.startSeconds, true)
+          else if (payload.event == "playbackRateChange") {
+            // isStateChangeFromBroadcastData = true;
+            player.seekTo(Math.ceil(payload.startSeconds), true)
             player.setPlaybackRate(payload.playbackRate);
+          }
+          else if (payload.event == "newStart") {
+            // isStateChangeFromBroadcastData = true;
+            player.loadVideoById(payload.videoId);
+            player.playVideo();
           }
         }
          
-        // }
-        // if (payload.event == -1) {
-        //   player.loadVideoById(payload.videoId, payload.startSeconds);
-        //   player.playVideo();
-        // }
-        
+        // player.addEventListener('onStateChange', 'onPlayerStateChange');
       }
     }
     console.log("Data Received");
@@ -171,4 +195,44 @@ function handle_connection(conn) {
     connection_status = false;
   });
   connections.push(conn);
+}
+
+function fetch_current_video_status(event) {
+  var yt_event;
+  if (event != null){
+    yt_event = event;
+  }
+  else {
+    yt_event = player.getPlayerState();
+  }
+  // var videoId = videoId;
+  var startSeconds = player.getCurrentTime();
+  var playbackRate = player.getPlaybackRate();
+
+  var payload = {
+    "event" : yt_event,
+    // "state" : "start",
+    "videoId": videoId,
+    "startSeconds": startSeconds,
+    "playbackRate": playbackRate
+  };
+
+  return payload;
+}
+
+function broadcast_data(conn=null, event=null) {
+  // console.log(conn);
+  payloadData = fetch_current_video_status(event);
+  console.log("Sent state : " + payloadData.event);
+  msg = { type: "event_data", payload: payloadData };
+
+  if (conn !== null) {
+    conn.send(msg);
+  }
+  else {
+    for (var i = 0; i < connections.length; i++) {
+      connections[i].send(msg);
+    }
+  }
+  
 }

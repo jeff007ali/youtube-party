@@ -9,21 +9,24 @@
     
   </head>
   <body>
-    <div id="status" class="status"></div>
-    <br />
-    <input
-      type="text"
-      id="sendMessageBox"
-      placeholder="Enter a message..."
-      autofocus="true"
-    />
-    <button type="button" id="sendButton">Send</button>
-    <hr />
-    <div class="message" id="message"></div>
+    <div id="player" style="position: fixed;"></div>
 
-    <hr />
+    <div id="chatbox" class="chatbox" style="position: fixed; top: 400px; left: 0; padding: 3px;">
+      <div id="status" class="status"></div>
+      <br />
+      <input
+        type="text"
+        id="sendMessageBox"
+        placeholder="Enter a message..."
+        autofocus="true"
+      />
+      <button type="button" id="sendButton">Send</button>
+      <hr />
+      <div class="message" id="message" style="overflow: auto;"></div>
+      <hr />
+    </div>
 
-    <div id="player"></div>
+    
     <script src="script.js"></script>
   </body>
 </html>
